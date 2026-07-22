@@ -26,18 +26,18 @@ def convert_media(req: MediaRequest):
     if not req.url:
         raise HTTPException(status_code=400, detail="URL is required")
 
-    # YouTubeのボットブロックを通過するための高度な設定
+    # ボットブロックを徹底的に回避する設定
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'android', 'mweb'],
-                'skip': ['webpage', 'configs']
+                'player_client': ['android', 'ios', 'mweb'],
+                'player_skip': ['configs', 'webpage']
             }
         },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
         }
     }
@@ -61,4 +61,6 @@ def convert_media(req: MediaRequest):
                 "downloadUrl": media_url
             }
     except Exception as e:
+        # 例外が発生してもサーバーを落とさず500レスポンスを返す
+        print(f"Error during extraction: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
