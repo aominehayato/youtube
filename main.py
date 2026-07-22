@@ -36,20 +36,28 @@ def convert_media(req: MediaRequest):
     if not req.url:
         raise HTTPException(status_code=400, detail="URL is required")
 
-    # android と web の両方をクライアント候補として指定
+    cookie_path = os.path.join(os.path.dirname(__file__), 'cookies.txt')
+    cookie_exists = os.path.exists(cookie_path)
+    
+    # ログ出力によるデバッグ確認
+    print(f"[Cookie Status] exists: {cookie_exists}, path: {cookie_path}")
+
+    # User-Agent および player_client の調整
     ydl_opts = {
         'quiet': False,
         'no_warnings': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web']
+                'player_client': ['web']
             }
+        },
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
     }
 
-    # cookies.txtが存在する場合は読み込む
-    cookie_path = os.path.join(os.path.dirname(__file__), 'cookies.txt')
-    if os.path.exists(cookie_path):
+    # cookies.txtが存在する場合は追加
+    if cookie_exists:
         ydl_opts['cookiefile'] = cookie_path
 
     try:
