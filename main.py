@@ -27,21 +27,10 @@ def convert_media(req: MediaRequest):
     if not req.url:
         raise HTTPException(status_code=400, detail="URL is required")
 
-    # フォーマット指定を確実な単体ストリーム優先に変更
-    if req.format == "mp3":
-        format_spec = "bestaudio/best"
-    else:
-        format_spec = "best"
-
+    # yt-dlp 内部でのフォーマットフィルタリングによるエラーを防止するため 'format' 指定を解除
     ydl_opts = {
         'quiet': False,
         'no_warnings': False,
-        'format': format_spec,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android']
-            }
-        }
     }
 
     # cookies.txtが存在する場合は読み込む
@@ -55,26 +44,24 @@ def convert_media(req: MediaRequest):
             
             media_url = None
 
-            # 1. 直接単一のURLが取れている場合
+            # 1. 単一の直接URLが取得できている場合
             if info.get('url'):
                 media_url = info.get('url')
 
-            # 2. requested_formats（映像・音声が分離している場合）の適切な抽出
+            # 2. requested_formats (映像・音声が分離している場合) からの抽出
             elif 'requested_formats' in info and len(info['requested_formats']) > 0:
                 for fmt in info['requested_formats']:
                     if req.format == "mp3":
-                        # 音声リクエストの場合は acodec が存在するストリームを選択
                         if fmt.get('vcodec') == 'none' or fmt.get('acodec') != 'none':
                             media_url = fmt.get('url')
                             if fmt.get('vcodec') == 'none':
-                                break  # 完全な音声専用ストリームが見つかれば確定
+                                break
                     else:
-                        # 動画リクエストの場合は vcodec が存在するストリームを選択
                         if fmt.get('vcodec') != 'none':
                             media_url = fmt.get('url')
                             break
 
-            # 3. formats 一覧からのフォールバック処理
+            # 3. formats 一覧から条件に適合する URL を手動検索して抽出
             if not media_url and 'formats' in info:
                 for f in reversed(info['formats']):
                     if f.get('url'):
