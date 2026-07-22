@@ -31,6 +31,39 @@ def debug_env():
         "ffmpeg": subprocess.getoutput("ffmpeg -version").split("\n")[0]
     }
 
+def extract_url_from_info(info, target_format: str):
+    media_url = None
+
+    # 1. 単一の直接URLが取得できている場合
+    if info.get('url'):
+        media_url = info.get('url')
+
+    # 2. requested_formats (映像・音声が分離している場合) からの抽出
+    elif 'requested_formats' in info and len(info['requested_formats']) > 0:
+        for fmt in info['requested_formats']:
+            if target_format == "mp3":
+                if fmt.get('vcodec') == 'none' or fmt.get('acodec') != 'none':
+                    media_url = fmt.get('url')
+                    if fmt.get('vcodec') == 'none':
+                        break
+            else:
+                if fmt.get('vcodec') != 'none':
+                    media_url = fmt.get('url')
+                    break
+
+    # 3. formats 一覧から条件に適合する URL を手動検索して抽出
+    if not media_url and 'formats' in info:
+        for f in reversed(info['formats']):
+            if f.get('url'):
+                if target_format == "mp3" and f.get('acodec') != 'none':
+                    media_url = f.get('url')
+                    break
+                elif target_format != "mp3" and f.get('vcodec') != 'none':
+                    media_url = f.get('url')
+                    break
+
+    return media_url
+
 @app.post("/api/convert")
 def convert_media(req: MediaRequest):
     if not req.url:
@@ -39,11 +72,10 @@ def convert_media(req: MediaRequest):
     cookie_path = os.path.join(os.path.dirname(__file__), 'cookies.txt')
     cookie_exists = os.path.exists(cookie_path)
     
-    # ログ出力によるデバッグ確認
     print(f"[Cookie Status] exists: {cookie_exists}, path: {cookie_path}")
 
-    # User-Agent および player_client の調整
-    ydl_opts = {
+    # 第1試行オプション: Cookieあり + Webクライアント
+    ydl_opts_primary = {
         'quiet': False,
         'no_warnings': False,
         'extractor_args': {
@@ -55,47 +87,43 @@ def convert_media(req: MediaRequest):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
     }
-
-    # cookies.txtが存在する場合は追加
     if cookie_exists:
-        ydl_opts['cookiefile'] = cookie_path
+        ydl_opts_primary['cookiefile'] = cookie_path
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        print("Attempting primary extraction (with cookies if available)...")
+        with yt_dlp.YoutubeDL(ydl_opts_primary) as ydl:
             info = ydl.extract_info(req.url, download=False)
+            media_url = extract_url_from_info(info, req.format)
             
-            media_url = None
+            if media_url:
+                return {
+                    "status": "success",
+                    "format": req.format,
+                    "downloadUrl": media_url
+                }
+    except Exception as e:
+        print(f"Primary extraction failed: {str(e)}")
 
-            # 1. 単一の直接URLが取得できている場合
-            if info.get('url'):
-                media_url = info.get('url')
+    # 第2試行オプション (フォールバック): Cookieなし + Androidクライアント
+    print("Attempting fallback extraction (No cookies, android client)...")
+    ydl_opts_fallback = {
+        'quiet': False,
+        'no_warnings': False,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android']
+            }
+        }
+    }
 
-            # 2. requested_formats (映像・音声が分離している場合) からの抽出
-            elif 'requested_formats' in info and len(info['requested_formats']) > 0:
-                for fmt in info['requested_formats']:
-                    if req.format == "mp3":
-                        if fmt.get('vcodec') == 'none' or fmt.get('acodec') != 'none':
-                            media_url = fmt.get('url')
-                            if fmt.get('vcodec') == 'none':
-                                break
-                    else:
-                        if fmt.get('vcodec') != 'none':
-                            media_url = fmt.get('url')
-                            break
-
-            # 3. formats 一覧から条件に適合する URL を手動検索して抽出
-            if not media_url and 'formats' in info:
-                for f in reversed(info['formats']):
-                    if f.get('url'):
-                        if req.format == "mp3" and f.get('acodec') != 'none':
-                            media_url = f.get('url')
-                            break
-                        elif req.format != "mp3" and f.get('vcodec') != 'none':
-                            media_url = f.get('url')
-                            break
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl:
+            info = ydl.extract_info(req.url, download=False)
+            media_url = extract_url_from_info(info, req.format)
 
             if not media_url:
-                raise HTTPException(status_code=500, detail="Failed to extract media URL")
+                raise HTTPException(status_code=500, detail="Failed to extract media URL in fallback mode")
 
             return {
                 "status": "success",
@@ -103,5 +131,5 @@ def convert_media(req: MediaRequest):
                 "downloadUrl": media_url
             }
     except Exception as e:
-        print(f"Extraction Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Fallback extraction error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Extraction Error: {str(e)}")
