@@ -5,7 +5,6 @@ import yt_dlp
 
 app = FastAPI()
 
-# CORS対応（GASからのアクセスを許可）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,13 +26,13 @@ def convert_media(req: MediaRequest):
     if not req.url:
         raise HTTPException(status_code=400, detail="URL is required")
 
-    # ボット検出（Sign in to confirm you're not a bot）を回避するための設定
+    # YouTubeのボット検出(Sign in to confirm...)を強力に回避するクライアント設定
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'android', 'mweb']
+                'player_client': ['mweb', 'tv', 'web_embedded']
             }
         }
     }
