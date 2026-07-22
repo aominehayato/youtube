@@ -27,10 +27,15 @@ def convert_media(req: MediaRequest):
     if not req.url:
         raise HTTPException(status_code=400, detail="URL is required")
 
-    # yt-dlp 内部でのフォーマットフィルタリングによるエラーを防止するため 'format' 指定を解除
+    # EJS（JavaScriptランタイム）を活用しつつWebクライアント経由で抽出
     ydl_opts = {
         'quiet': False,
         'no_warnings': False,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['web']
+            }
+        }
     }
 
     # cookies.txtが存在する場合は読み込む
