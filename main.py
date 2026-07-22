@@ -30,6 +30,12 @@ def convert_media(req: MediaRequest):
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
+        # クライアントを ios や android に変更して Bot 判定を回避を試みる
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'android', 'web']
+            }
+        }
     }
 
     # cookies.txtが存在する場合は自動的に読み込む
