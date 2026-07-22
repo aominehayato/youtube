@@ -2,10 +2,28 @@ import express from "express";
 import cors from "cors";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
 const execFileAsync = promisify(execFile);
 const app = express();
 const PORT = process.env.PORT || 10000;
+
+// 絶対パスの取得設定
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// bin/yt-dlp への絶対パスを決定
+const YTDLP_PATH = path.join(__dirname, "bin", "yt-dlp");
+
+// 起動時に存在確認ログを出力
+console.log("Checking yt-dlp binary path:", YTDLP_PATH);
+if (fs.existsSync(YTDLP_PATH)) {
+  console.log("yt-dlp binary exists: TRUE");
+} else {
+  console.error("CRITICAL ERROR: yt-dlp binary NOT found at path above!");
+}
 
 // CORS の設定
 const corsOptions = {
@@ -20,7 +38,12 @@ app.use(express.json());
 
 // ヘルスチェック用エンドポイント
 app.get("/", (req, res) => {
-  res.json({ status: "yt-dlp Stream API is running" });
+  const exists = fs.existsSync(YTDLP_PATH);
+  res.json({
+    status: "yt-dlp Stream API is running",
+    ytDlpExists: exists,
+    ytDlpPath: YTDLP_PATH
+  });
 });
 
 // 動画メタデータ取得エンドポイント (/api/info)
@@ -40,7 +63,7 @@ app.post("/api/info", async (req, res) => {
   ];
 
   try {
-    const { stdout } = await execFileAsync("yt-dlp", args);
+    const { stdout } = await execFileAsync(YTDLP_PATH, args);
     const info = JSON.parse(stdout);
 
     res.json({
@@ -69,7 +92,6 @@ app.post("/api/stream", async (req, res) => {
 
   const url = `https://www.youtube.com/watch?v=${videoId}`;
   
-  // フォーマット指定（MP3希望の場合は音声のみ、デフォルトはMP4/プログレッシブ形式を優先）
   let formatOption = "best[ext=mp4]/best";
   if (format === "mp3") {
     formatOption = "bestaudio[ext=m4a]/bestaudio";
@@ -84,8 +106,8 @@ app.post("/api/stream", async (req, res) => {
   ];
 
   try {
-    const { stdout } = await execFileAsync("yt-dlp", args);
-    const streamUrl = stdout.trim().split("\n")[0]; // 最初のURLを取得
+    const { stdout } = await execFileAsync(YTDLP_PATH, args);
+    const streamUrl = stdout.trim().split("\n")[0];
 
     if (!streamUrl) {
       return res.status(500).json({ error: "Stream URL not found" });
@@ -123,11 +145,10 @@ app.get("/api/play", async (req, res) => {
   ];
 
   try {
-    const { stdout } = await execFileAsync("yt-dlp", args);
+    const { stdout } = await execFileAsync(YTDLP_PATH, args);
     const streamUrl = stdout.trim().split("\n")[0];
 
     if (streamUrl) {
-      // Googlevideo の直リンクへ 302 リダイレクト
       res.redirect(302, streamUrl);
     } else {
       res.status(500).send("Failed to get stream URL");
