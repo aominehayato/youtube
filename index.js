@@ -5,7 +5,18 @@ import { Innertube } from "youtubei.js";
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(cors());
+// CORS の詳細設定
+const corsOptions = {
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: false
+};
+
+// CORS ミドルウェアの適用
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
 app.use(express.json());
 
 let innertube;
