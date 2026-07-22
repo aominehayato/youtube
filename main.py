@@ -27,13 +27,20 @@ def convert_media(req: MediaRequest):
     if not req.url:
         raise HTTPException(status_code=400, detail="URL is required")
 
+    # フォーマット指定をより汎用的なフォールバック構造に変更
+    if req.format == "mp3":
+        format_spec = 'bestaudio/best'
+    else:
+        format_spec = 'bestvideo+bestaudio/best'
+
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
-        # クライアントを ios や android に変更して Bot 判定を回避を試みる
+        'format': format_spec,
+        # 各種クライアントをフォールバックとして試行
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'android', 'web']
+                'player_client': ['android', 'ios', 'web']
             }
         }
     }
@@ -43,15 +50,23 @@ def convert_media(req: MediaRequest):
     if os.path.exists(cookie_path):
         ydl_opts['cookiefile'] = cookie_path
 
-    if req.format == "mp3":
-        ydl_opts['format'] = 'bestaudio/best'
-    else:
-        ydl_opts['format'] = 'best[ext=mp4]/best'
-
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(req.url, download=False)
+            
+            # URLの取得（Direct URL または プレイリスト・ストリーム一覧からのフォールバック）
             media_url = info.get('url')
+
+            if not media_url and 'requested_formats' in info:
+                # 映像と音声が分離している場合は音声または映像のURLを取得
+                media_url = info['requested_formats'][0].get('url')
+
+            if not media_url and 'formats' in info:
+                # 最終フォールバック：利用可能なフォーマット一覧から最初のURLを取得
+                for f in info['formats']:
+                    if f.get('url'):
+                        media_url = f.get('url')
+                        break
 
             if not media_url:
                 raise HTTPException(status_code=500, detail="Failed to extract media URL")
