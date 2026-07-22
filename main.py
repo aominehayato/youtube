@@ -5,7 +5,7 @@ import yt_dlp
 
 app = FastAPI()
 
-# CORS対応（GASからのアクセスを許可）
+# CORSを全許可（GASからのアクセスを許可）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
