@@ -1,4 +1,5 @@
 import os
+import subprocess
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -22,18 +23,26 @@ class MediaRequest(BaseModel):
 def read_root():
     return {"status": "API Server is running successfully!"}
 
+@app.get("/debug")
+def debug_env():
+    return {
+        "yt-dlp": subprocess.getoutput("yt-dlp --version"),
+        "node": subprocess.getoutput("node -v"),
+        "ffmpeg": subprocess.getoutput("ffmpeg -version").split("\n")[0]
+    }
+
 @app.post("/api/convert")
 def convert_media(req: MediaRequest):
     if not req.url:
         raise HTTPException(status_code=400, detail="URL is required")
 
-    # EJS（JavaScriptランタイム）を活用しつつWebクライアント経由で抽出
+    # android と web の両方をクライアント候補として指定
     ydl_opts = {
         'quiet': False,
         'no_warnings': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['web']
+                'player_client': ['android', 'web']
             }
         }
     }
