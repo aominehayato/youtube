@@ -14,7 +14,8 @@ import playlistRouter from "./routes/playlist.js";
 
 const app = express();
 
-app.use(express.json());
+// 巨大JSON送信によるOOM攻撃を防ぐため、100kbに厳格に制限
+app.use(express.json({ limit: "100kb" }));
 
 // セキュリティヘッダーおよびレスポンス圧縮の適用
 app.use(helmet());
@@ -87,16 +88,29 @@ function stableStringify(obj) {
 }
 
 /**
- * 3. Canonical JSON対応の厳格なHMAC署名検証ミドルウェア
+ * タイミング攻撃を防ぐ安全な文字列比較関数
+ */
+function safeCompare(a, b) {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * 3. Canonical JSON対応およびtimingSafeEqualによる厳格なHMAC署名検証ミドルウェア
  */
 app.use((req, res, next) => {
   const serverApiKey = process.env.API_KEY;
   if (!serverApiKey) {
-    return res.status(500).json({ error: "Server configuration error: API_KEY is not configured on the server." });
+    logger.error("Server configuration error: API_KEY is not configured.");
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 
   const clientApiKey = req.headers["x-api-key"];
-  if (clientApiKey !== serverApiKey) {
+  if (!clientApiKey || !safeCompare(clientApiKey, serverApiKey)) {
     return res.status(403).json({ error: "Forbidden: Invalid or missing API key." });
   }
 
@@ -134,7 +148,7 @@ app.use((req, res, next) => {
     .update(payload)
     .digest("hex");
 
-  if (clientSignature !== expectedSignature) {
+  if (!safeCompare(clientSignature, expectedSignature)) {
     return res.status(403).json({ error: "Forbidden: Invalid request signature or tampered payload." });
   }
 
@@ -149,7 +163,13 @@ app.use("/api/comment", commentRouter);
 app.use("/api/channel", channelRouter);
 app.use("/api/playlist", playlistRouter);
 
+// グローバルエラーハンドリングミドルウェア（内部エラー情報の外部流出を完全阻止）
+app.use((err, req, res, next) => {
+  logger.error({ err }, "Unhandled application error");
+  res.status(500).json({ error: "Internal Server Error" });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  logger.info("SiaTube Production API server v2.9.1 started on port " + PORT);
+  logger.info("SiaTube Production API server v3.0.0 started on port " + PORT);
 });
