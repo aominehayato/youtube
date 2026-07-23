@@ -1,16 +1,16 @@
 import express from "express";
-import { getYouTube } from "../utils/youtube.js";
+import { getYouTube, resetYouTubeIfCritical } from "../utils/youtube.js";
+import { commentLimiter } from "../utils/limiter.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 
 /**
  * GET /api/comment/:id
- * 動画のコメント一覧を取得する
  */
-router.get("/:id", async (req, res) => {
+router.get("/:id", commentLimiter, async (req, res) => {
   const videoId = req.params.id;
 
-  // 動画IDの形式検証
   if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
     return res.status(400).json({ error: "Invalid video id format." });
   }
@@ -25,6 +25,7 @@ router.get("/:id", async (req, res) => {
 
     for (let i = 0; i < contents.length; i++) {
       const c = contents[i];
+      if (!c) continue;
       commentsList.push({
         author: c.author?.name || "Anonymous",
         text: c.content?.text || "",
@@ -39,7 +40,8 @@ router.get("/:id", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Comments error for ID " + videoId + ":", error);
+    logger.error({ err: error, videoId }, "Comments error");
+    resetYouTubeIfCritical(error);
     res.status(500).json({ error: error.message });
   }
 });
