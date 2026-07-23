@@ -5,7 +5,7 @@ const router = express.Router();
 
 /**
  * GET /api/search?q=キーワード
- * YouTube上の動画、チャンネル、プレイリストを検索して返す
+ * YouTube上の動画やチャンネルを検索して返す
  */
 router.get("/", async (req, res) => {
   const query = req.query.q;
@@ -16,7 +16,7 @@ router.get("/", async (req, res) => {
 
   try {
     const youtube = await getYouTube();
-    const searchResult = await youtube.search(query, { type: "video" });
+    const searchResult = await youtube.search(query);
 
     const results = [];
     const videos = searchResult.results || [];
