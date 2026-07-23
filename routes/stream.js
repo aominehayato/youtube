@@ -51,7 +51,14 @@ router.get("/:id", streamLimiter, (req, res) => {
   const ytDlpFileName = isWindows ? "yt-dlp.exe" : "yt-dlp";
   const ytDlpPath = path.join(process.cwd(), "bin", ytDlpFileName);
 
-  if (!fs.existsSync(ytDlpPath)) {
+  const fileExists = fs.existsSync(ytDlpPath);
+  logger.info({
+    cwd: process.cwd(),
+    path: ytDlpPath,
+    exists: fileExists
+  }, "yt-dlp binary check");
+
+  if (!fileExists) {
     logger.error("Critical error: yt-dlp binary not found at " + ytDlpPath);
     return res.status(500).json({ error: "Internal Server Error" });
   }
