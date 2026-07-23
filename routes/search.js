@@ -1,5 +1,5 @@
 import express from "express";
-import { getYouTube } from "../utils/youtube.js";
+import { getYouTube, resetYouTube } from "../utils/youtube.js";
 
 const router = express.Router();
 
@@ -50,6 +50,7 @@ router.get("/", async (req, res) => {
 
   } catch (error) {
     console.error("Search error for query '" + query + "':", error);
+    resetYouTube();
     res.status(500).json({ error: error.message });
   }
 });
