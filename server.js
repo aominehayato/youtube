@@ -31,12 +31,6 @@ const globalApiLimiter = rateLimit({
 });
 app.use("/api/", globalApiLimiter);
 
-// エンドポイント別の細やかなレートリミット定義
-export const videoLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
-export const searchLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
-export const commentLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
-export const streamLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
-
 // 1. /health エンドポイントは認証やCORSの前に配置
 app.get("/health", (req, res) => {
   res.json({
@@ -70,7 +64,30 @@ app.use((req, res, next) => {
 });
 
 /**
- * 3. クエリパラメータおよびボディ双方の改ざんを完全に防ぐ厳格なHMAC署名検証ミドルウェア
+ * オブジェクトのキーをアルファベット順にソートしてCanonical JSON文字列を生成する関数
+ */
+function stableStringify(obj) {
+  if (obj === null || typeof obj !== "object") {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return "[" + obj.map(stableStringify).join(",") + "]";
+  }
+  const keys = Object.keys(obj).sort();
+  let result = "{";
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    result += JSON.stringify(key) + ":" + stableStringify(obj[key]);
+    if (i < keys.length - 1) {
+      result += ",";
+    }
+  }
+  result += "}";
+  return result;
+}
+
+/**
+ * 3. Canonical JSON対応の厳格なHMAC署名検証ミドルウェア
  */
 app.use((req, res, next) => {
   const serverApiKey = process.env.API_KEY;
@@ -96,9 +113,20 @@ app.use((req, res, next) => {
     return res.status(401).json({ error: "Unauthorized: Request timestamp expired or invalid." });
   }
 
-  const rawBody = req.body && Object.keys(req.body).length > 0 ? JSON.stringify(req.body) : "";
+  let parsedBody = {};
+  if (req.body && Object.keys(req.body).length > 0) {
+    parsedBody = req.body;
+  }
+  const rawBody = Object.keys(parsedBody).length > 0 ? stableStringify(parsedBody) : "";
   const bodyHash = crypto.createHash("sha256").update(rawBody).digest("hex");
-  const queryHash = crypto.createHash("sha256").update(JSON.stringify(req.query)).digest("hex");
+
+  let parsedQuery = {};
+  if (req.query && Object.keys(req.query).length > 0) {
+    parsedQuery = req.query;
+  }
+  const rawQuery = Object.keys(parsedQuery).length > 0 ? stableStringify(parsedQuery) : "{}";
+  const queryHash = crypto.createHash("sha256").update(rawQuery).digest("hex");
+
   const payload = [clientTimestamp, req.method, req.originalUrl, bodyHash, queryHash].join(":");
 
   const expectedSignature = crypto
@@ -123,5 +151,5 @@ app.use("/api/playlist", playlistRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  logger.info("SiaTube Production API server v2.9.0 started on port " + PORT);
+  logger.info("SiaTube Production API server v2.9.1 started on port " + PORT);
 });
