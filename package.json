@@ -1,7 +1,7 @@
 {
   "name": "siatube-backend",
-  "version": "2.4.0",
-  "description": "SiaTube Production Backend API Server",
+  "version": "2.5.0",
+  "description": "SiaTube Production Backend API Server with Advanced Security and Robustness",
   "main": "server.js",
   "type": "module",
   "scripts": {
