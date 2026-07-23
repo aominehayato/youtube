@@ -17,8 +17,10 @@ app.set("trust proxy", 1);
 // 巨大JSON送信によるOOM攻撃を防ぐため、100kbに厳格に制限
 app.use(express.json({ limit: "100kb" }));
 
-// セキュリティヘッダーおよびレスポンス圧縮の適用
-app.use(helmet());
+// セキュリティヘッダー（CORP制限を解除して他オリジンからの動画読み込みを許可）およびレスポンス圧縮の適用
+app.use(helmet({
+  crossOriginResourcePolicy: false
+}));
 app.use(compression());
 app.use(pinoHttp({ logger }));
 
@@ -112,7 +114,7 @@ function safeCompare(a, b) {
  * 3. Canonical JSON対応およびtimingSafeEqualによる厳格なHMAC署名検証ミドルウェア（APIキーと署名シークレットの分離）
  */
 app.use((req, res, next) => {
-  if (req.path === "/" || req.path === "/health") {
+  if (req.path === "/" || req.path === "/health" || req.path.startsWith("/api/stream")) {
     return next();
   }
 
