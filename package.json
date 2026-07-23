@@ -1,11 +1,10 @@
 {
   "name": "siatube-backend",
-  "version": "2.5.0",
-  "description": "SiaTube Production Backend API Server with Advanced Security and Robustness",
+  "version": "2.6.0",
+  "description": "SiaTube Production Backend API Server with Strict Security and Docker Optimization",
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "postinstall": "node scripts/install-ytdlp.js",
     "start": "node server.js"
   },
   "engines": {
