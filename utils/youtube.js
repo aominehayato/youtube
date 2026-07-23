@@ -1,45 +1,69 @@
-import { Innertube } from "youtubei.js";
+import express from "express";
+import { getYouTube, resetYouTube } from "../utils/youtube.js";
 
-let instance = null;
-let initializing = null;
+const router = express.Router();
 
 /**
- * 同時大量アクセス時の競合を防ぎ、安全にInnertubeインスタンスをシングルトン共有・初期化する関数
+ * GET /api/video/:id
+ * 動画の詳細情報および関連動画一覧を取得してJSONで返却する
  */
-export async function getYouTube() {
-  if (instance) {
-    return instance;
+router.get("/:id", async (req, res) => {
+  const videoId = req.params.id;
+
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+    return res.status(400).json({ error: "Invalid video id format." });
   }
 
-  if (initializing) {
-    return initializing;
-  }
+  try {
+    const youtube = await getYouTube();
+    const info = await youtube.getInfo(videoId);
 
-  initializing = (async () => {
-    try {
-      const createdInstance = await Innertube.create({
-        lang: "ja",
-        location: "JP",
-        retrieve_player: true
-      });
-      instance = createdInstance;
-      return instance;
-    } catch (err) {
-      console.error("Failed to initialize Innertube instance:", err);
-      instance = null;
-      throw err;
-    } finally {
-      initializing = null;
+    if (!info || !info.basic_info) {
+      return res.status(404).json({ error: "Video information unavailable or removed." });
     }
-  })();
 
-  return initializing;
-}
+    const basicInfo = info.basic_info;
+    const thumbnails = basicInfo.thumbnail || [];
+    const thumbnailUrl = thumbnails.length > 0 ? thumbnails[thumbnails.length - 1].url : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
-/**
- * 障害発生時にインスタンスを破棄し、次回呼び出し時に強制再初期化を行わせるための復旧関数
- */
-export function resetYouTube() {
-  instance = null;
-  initializing = null;
-}
+    const relatedVideos = [];
+    const watchNextFeed = info.watch_next_feed?.contents ?? info.secondary_contents ?? [];
+    for (let i = 0; i < watchNextFeed.length; i++) {
+      const item = watchNextFeed[i];
+      if (item && (item.type === "CompactVideo" || item.id)) {
+        relatedVideos.push({
+          id: item.id || "",
+          title: item.title?.text || item.title || "",
+          thumbnail: item.thumbnails?.[0]?.url || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
+          author: item.author?.name || "",
+          duration: item.duration?.text || ""
+        });
+      }
+    }
+
+    res.json({
+      id: videoId,
+      title: basicInfo.title || "",
+      views: basicInfo.view_count || 0,
+      likes: basicInfo.like_count || 0,
+      description: basicInfo.short_description || "",
+      duration: basicInfo.duration || 0,
+      author: {
+        id: basicInfo.channel_id || "",
+        name: basicInfo.author || "",
+        icon: ""
+      },
+      thumbnail: thumbnailUrl,
+      relatedVideos: relatedVideos
+    });
+
+  } catch (error) {
+    console.error("Error fetching video info for ID " + videoId + ":", error);
+    resetYouTube();
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
+export default router;
