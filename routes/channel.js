@@ -5,7 +5,7 @@ const router = express.Router();
 
 /**
  * GET /api/channel/:id
- * チャンネル詳細および動画一覧を取得する
+ * チャンネル詳細情報および動画一覧を取得する
  */
 router.get("/:id", async (req, res) => {
   const channelId = req.params.id;
@@ -29,6 +29,9 @@ router.get("/:id", async (req, res) => {
 
     res.json({
       channelName: channel.metadata?.title || "Channel",
+      avatar: channel.metadata?.avatar?.[0]?.url || "",
+      banner: channel.metadata?.banner?.[0]?.url || "",
+      subscriberCount: channel.metadata?.subscriber_count || "",
       videos: videos
     });
 
