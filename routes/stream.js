@@ -29,6 +29,9 @@ function processQueue() {
  * yt-dlp を用いてYouTubeのストリームURLを取得し、同時実行制御とキャッシュを活用して高速リダイレクトする
  */
 router.get("/:id", streamLimiter, (req, res) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Cross-Origin-Resource-Policy", "cross-origin");
+
   const videoId = req.params.id;
 
   if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
