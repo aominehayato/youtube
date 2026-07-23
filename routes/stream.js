@@ -63,16 +63,20 @@ router.get("/:id", streamLimiter, (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 
+  // RenderのSecret Filesで配置されるCookieファイルのパス確認
+  const cookiePath = "/etc/secrets/cookies.txt";
+  const cookieExists = fs.existsSync(cookiePath);
+  logger.info({
+    exists: cookieExists,
+    size: cookieExists ? fs.statSync(cookiePath).size : 0
+  }, "cookie check");
+
   const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
-  // RenderのSecret Files機能で配置されたCookieファイルのパス（存在する場合は自動適用）
-  const cookiePath = "/etc/secrets/cookies.txt";
   const ytDlpArgs = ["-g", "--no-warnings", "--no-playlist"];
-  
-  if (fs.existsSync(cookiePath)) {
+  if (cookieExists) {
     ytDlpArgs.push("--cookies", cookiePath);
   }
-  
   ytDlpArgs.push(videoUrl);
 
   const runYtDlp = () => {
@@ -90,8 +94,8 @@ router.get("/:id", streamLimiter, (req, res) => {
           videoId
         }, "yt-dlp failed");
 
-        return res.status(503).json({
-          error: "YouTube blocked this server or requires authentication. Please configure cookies."
+        return res.status(500).json({
+          error: "yt-dlp failed"
         });
       }
 
