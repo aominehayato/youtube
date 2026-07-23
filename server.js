@@ -11,6 +11,9 @@ import streamRouter from "./routes/stream.js";
 
 const app = express();
 
+// Renderなどのプロキシ環境下における信頼設定
+app.set("trust proxy", 1);
+
 // 巨大JSON送信によるOOM攻撃を防ぐため、100kbに厳格に制限
 app.use(express.json({ limit: "100kb" }));
 
@@ -29,11 +32,18 @@ const globalApiLimiter = rateLimit({
 });
 app.use("/api/", globalApiLimiter);
 
-// 1. /health エンドポイントは認証やCORSの前に配置
+// 1. /health および / エンドポイントは認証やCORSの前に配置
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
     timestamp: new Date().toISOString()
+  });
+});
+
+app.get("/", (req, res) => {
+  res.json({
+    name: "SiaTube API Server",
+    status: "running"
   });
 });
 
@@ -102,6 +112,10 @@ function safeCompare(a, b) {
  * 3. Canonical JSON対応およびtimingSafeEqualによる厳格なHMAC署名検証ミドルウェア（APIキーと署名シークレットの分離）
  */
 app.use((req, res, next) => {
+  if (req.path === "/" || req.path === "/health") {
+    return next();
+  }
+
   const serverApiKey = process.env.API_KEY;
   const hmacSecret = process.env.HMAC_SECRET || serverApiKey;
 
