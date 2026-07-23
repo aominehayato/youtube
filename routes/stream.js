@@ -84,7 +84,7 @@ router.get("/:id", streamLimiter, (req, res) => {
 
   const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
-  // YouTubeのボット対策として、適切なUser-Agentおよびplayer_clientを指定
+  // YouTubeのボット対策として、androidクライアントを単体指定して認証エラーを回避
   const ytDlpArgs = [
     "-g",
     "--no-warnings",
@@ -92,10 +92,8 @@ router.get("/:id", streamLimiter, (req, res) => {
     "--no-cache-dir",
     "--js-runtimes",
     "node:/usr/local/bin/node",
-    "--user-agent",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "--extractor-args",
-    "youtube:player_client=android,web"
+    "youtube:player_client=android"
   ];
 
   if (cookieExists) {
