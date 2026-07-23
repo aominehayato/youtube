@@ -1,14 +1,24 @@
 import express from "express";
 import { execFile } from "child_process";
 import path from "path";
+import rateLimit from "express-rate-limit";
 
 const router = express.Router();
 
+// レートリミット設定（1分間に最大15回までのリクエストに制限し、サーバー過負荷を防ぐ）
+const streamLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many stream requests from this IP, please try again later." }
+});
+
 /**
  * GET /api/stream/:id
- * yt-dlp を用いてYouTubeのストリーム情報をJSON形式で安全に取得する
+ * yt-dlp を用いてYouTubeのストリームURLを取得し、クライアントへ直接リダイレクトする
  */
-router.get("/:id", (req, res) => {
+router.get("/:id", streamLimit, (req, res) => {
   const videoId = req.params.id;
 
   // 動画IDの形式検証（インジェクション対策）
@@ -16,31 +26,27 @@ router.get("/:id", (req, res) => {
     return res.status(400).json({ error: "Invalid video id format." });
   }
 
-  const ytDlpPath = path.join(process.cwd(), "bin", "yt-dlp");
+  const isWindows = process.platform === "win32";
+  const ytDlpFileName = isWindows ? "yt-dlp.exe" : "yt-dlp";
+  const ytDlpPath = path.join(process.cwd(), "bin", ytDlpFileName);
   const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
-  // -j オプションを用いてJSONでメタデータおよび最適なプレイバックURLを取得
-  execFile(ytDlpPath, ["-j", "--no-warnings", videoUrl], { timeout: 15000 }, (error, stdout, stderr) => {
+  // yt-dlp からダイレクトなメディアストリームURLを取得する
+  execFile(ytDlpPath, ["-g", "--no-warnings", videoUrl], { timeout: 15000 }, (error, stdout, stderr) => {
     if (error) {
       console.error("yt-dlp stream execution error for ID " + videoId + ":", error);
-      return res.status(500).json({ error: "Failed to extract stream info via yt-dlp: " + error.message });
+      return res.status(500).json({ error: "Failed to extract stream URL via yt-dlp: " + error.message });
     }
 
-    try {
-      const info = JSON.parse(stdout.trim());
-      res.json({
-        id: videoId,
-        url: info.url || "",
-        audioUrl: info.audio_url || null,
-        width: info.width || null,
-        height: info.height || null,
-        fps: info.fps || null,
-        ext: info.ext || "mp4"
-      });
-    } catch (parseError) {
-      console.error("Failed to parse yt-dlp JSON output for ID " + videoId + ":", parseError);
-      return res.status(500).json({ error: "Failed to parse stream metadata." });
+    const urls = stdout.trim().split("\n");
+    const streamUrl = urls[0];
+
+    if (!streamUrl) {
+      return res.status(500).json({ error: "No stream URL returned from yt-dlp." });
     }
+
+    // 動画プレイヤーが直接ストリームを読み込めるようURLへリダイレクト
+    return res.redirect(302, streamUrl);
   });
 });
 
