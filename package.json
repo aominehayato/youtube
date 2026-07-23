@@ -1,0 +1,17 @@
+{
+  "name": "siatube-backend",
+  "version": "1.0.0",
+  "description": "SiaTube Backend API Server",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "youtubei.js": "^11.5.0"
+  }
+}
