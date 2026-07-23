@@ -1,13 +1,14 @@
 import express from "express";
-import { getYouTube, resetYouTube } from "../utils/youtube.js";
+import { getYouTube, resetYouTubeIfCritical } from "../utils/youtube.js";
+import { searchLimiter } from "../utils/limiter.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 
 /**
  * GET /api/search?q=キーワード
- * YouTube上の動画やチャンネルを安全に検索して返す
  */
-router.get("/", async (req, res) => {
+router.get("/", searchLimiter, async (req, res) => {
   const query = req.query.q;
 
   if (!query) {
@@ -49,8 +50,8 @@ router.get("/", async (req, res) => {
     res.json({ results: results });
 
   } catch (error) {
-    console.error("Search error for query '" + query + "':", error);
-    resetYouTube();
+    logger.error({ err: error, query }, "Search error");
+    resetYouTubeIfCritical(error);
     res.status(500).json({ error: error.message });
   }
 });
