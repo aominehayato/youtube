@@ -1,7 +1,7 @@
 {
   "name": "siatube-backend",
-  "version": "2.8.0",
-  "description": "SiaTube Production Backend API Server with Helmet, Compression, Global Rate Limit, and Robust Security",
+  "version": "2.9.0",
+  "description": "SiaTube Commercial-grade Backend API Server with pino logging, granular rate limits, query HMAC verification, and non-root security",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -15,6 +15,8 @@
     "express": "^4.19.2",
     "express-rate-limit": "^7.2.0",
     "helmet": "^8.0.0",
+    "pino": "^9.0.0",
+    "pino-http": "^10.0.0",
     "youtubei.js": "^14.0.0"
   }
 }
