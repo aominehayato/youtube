@@ -35,7 +35,10 @@ router.get("/:id", streamLimiter, (req, res) => {
     return res.status(400).json({ error: "Invalid video id format." });
   }
 
-  const cached = streamCache.get(videoId);
+  const format = req.query.format || "default";
+  const cacheKey = `${videoId}_${format}`;
+
+  const cached = streamCache.get(cacheKey);
   const now = Date.now();
   if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
     return res.redirect(302, cached.url);
@@ -74,7 +77,7 @@ router.get("/:id", streamLimiter, (req, res) => {
       if (streamCache.size >= MAX_CACHE_SIZE) {
         streamCache.clear();
       }
-      streamCache.set(videoId, { url: streamUrl, timestamp: Date.now() });
+      streamCache.set(cacheKey, { url: streamUrl, timestamp: Date.now() });
 
       return res.redirect(302, streamUrl);
     });
