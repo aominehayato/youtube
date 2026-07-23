@@ -84,7 +84,7 @@ router.get("/:id", streamLimiter, (req, res) => {
 
   const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
-  // YouTubeのボット対策として、androidクライアントを単体指定して認証エラーを回避
+  // JS Challenge 解決用ランタイム(Node.js)および複数クライアントの指定
   const ytDlpArgs = [
     "-g",
     "--no-warnings",
@@ -93,7 +93,7 @@ router.get("/:id", streamLimiter, (req, res) => {
     "--js-runtimes",
     "node:/usr/local/bin/node",
     "--extractor-args",
-    "youtube:player_client=android"
+    "youtube:player_client=web,android"
   ];
 
   if (cookieExists) {
