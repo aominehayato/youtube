@@ -1,11 +1,11 @@
 import express from "express";
+import fs from "fs";
 import { execFile } from "child_process";
 import path from "path";
 import rateLimit from "express-rate-limit";
 
 const router = express.Router();
 
-// レートリミット設定（1分間に最大15回までのリクエストに制限し、サーバー過負荷を防ぐ）
 const streamLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 15,
@@ -21,7 +21,6 @@ const streamLimit = rateLimit({
 router.get("/:id", streamLimit, (req, res) => {
   const videoId = req.params.id;
 
-  // 動画IDの形式検証（インジェクション対策）
   if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
     return res.status(400).json({ error: "Invalid video id format." });
   }
@@ -29,9 +28,15 @@ router.get("/:id", streamLimit, (req, res) => {
   const isWindows = process.platform === "win32";
   const ytDlpFileName = isWindows ? "yt-dlp.exe" : "yt-dlp";
   const ytDlpPath = path.join(process.cwd(), "bin", ytDlpFileName);
+
+  // yt-dlp バイナリの存在を事前検証し、ENOENTによるサーバークラッシュを完全防止
+  if (!fs.existsSync(ytDlpPath)) {
+    console.error("Critical error: yt-dlp binary not found at " + ytDlpPath);
+    return res.status(500).json({ error: "Server configuration error: yt-dlp is not installed." });
+  }
+
   const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
-  // yt-dlp からダイレクトなメディアストリームURLを取得する
   execFile(ytDlpPath, ["-g", "--no-warnings", videoUrl], { timeout: 15000 }, (error, stdout, stderr) => {
     if (error) {
       console.error("yt-dlp stream execution error for ID " + videoId + ":", error);
@@ -45,7 +50,6 @@ router.get("/:id", streamLimit, (req, res) => {
       return res.status(500).json({ error: "No stream URL returned from yt-dlp." });
     }
 
-    // 動画プレイヤーが直接ストリームを読み込めるようURLへリダイレクト
     return res.redirect(302, streamUrl);
   });
 });
