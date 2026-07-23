@@ -38,5 +38,4 @@ RUN chown -R siatube:siatube /app
 USER siatube
 
 EXPOSE 3000
-
 CMD ["npm", "start"]
