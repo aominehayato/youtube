@@ -1,13 +1,14 @@
 import express from "express";
-import { getYouTube } from "../utils/youtube.js";
+import { getYouTube, resetYouTubeIfCritical } from "../utils/youtube.js";
+import { videoLimiter } from "../utils/limiter.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 
 /**
  * GET /api/video/:id
- * 動画の詳細情報および関連動画一覧を取得してJSONで返却する
  */
-router.get("/:id", async (req, res) => {
+router.get("/:id", videoLimiter, async (req, res) => {
   const videoId = req.params.id;
 
   if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
@@ -18,7 +19,6 @@ router.get("/:id", async (req, res) => {
     const youtube = await getYouTube();
     const info = await youtube.getInfo(videoId);
 
-    // YouTube内部APIの仕様変更等によるデータ欠損を厳格に検知
     if (!info || !info.basic_info) {
       return res.status(404).json({ error: "Video information unavailable or removed." });
     }
@@ -59,10 +59,9 @@ router.get("/:id", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error fetching video info for ID " + videoId + ":", error);
-    res.status(500).json({
-      error: error.message
-    });
+    logger.error({ err: error, videoId }, "Error fetching video info");
+    resetYouTubeIfCritical(error);
+    res.status(500).json({ error: error.message });
   }
 });
 
