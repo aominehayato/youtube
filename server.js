@@ -11,6 +11,17 @@ const app = express();
 // JSON ボディパーサーのミドルウェアを設定
 app.use(express.json());
 
+// CORS 許可設定（GASやフロントエンドからのリクエストを通すため）
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // 各種ルート（APIエンドポイント）のマッピング
 app.use("/api/video", videoRouter);
 app.use("/api/search", searchRouter);
