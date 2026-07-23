@@ -17,14 +17,13 @@ COPY routes ./routes
 COPY utils ./utils
 COPY scripts ./scripts
 
-# yt-dlp 実行に必要なシステム依存関係のインストール、pip、yt-dlp-ejsの導入、バイナリの配置
+# yt-dlp 実行に必要なシステム依存関係（ffmpeg含む）のインストールとバイナリの配置
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        python3 \
-       python3-pip \
        ca-certificates \
        curl \
-    && python3 -m pip install --no-cache-dir -U yt-dlp yt-dlp-ejs \
+       ffmpeg \
     && mkdir -p /app/bin \
     && curl -fL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /app/bin/yt-dlp \
     && chmod +x /app/bin/yt-dlp
