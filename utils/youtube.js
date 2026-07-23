@@ -41,7 +41,14 @@ export async function getYouTube() {
  */
 export function resetYouTubeIfCritical(error) {
   const msg = error?.message || "";
-  if (msg.includes("LOGIN_REQUIRED") || msg.includes("Innertube") || msg.includes("Sign in") || msg.includes("bot")) {
+  if (
+    msg.includes("LOGIN_REQUIRED") ||
+    msg.includes("Innertube") ||
+    msg.includes("Sign in") ||
+    msg.includes("bot") ||
+    msg.includes("signature") ||
+    msg.includes("extract")
+  ) {
     logger.warn({ err: error }, "Critical YouTube API error detected. Resetting Innertube instance.");
     instance = null;
     initializing = null;
