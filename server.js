@@ -8,9 +8,6 @@ import logger from "./utils/logger.js";
 import videoRouter from "./routes/video.js";
 import searchRouter from "./routes/search.js";
 import streamRouter from "./routes/stream.js";
-import commentRouter from "./routes/comment.js";
-import channelRouter from "./routes/channel.js";
-import playlistRouter from "./routes/playlist.js";
 
 const app = express();
 
@@ -43,7 +40,7 @@ app.get("/health", (req, res) => {
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || "";
 const allowedOrigins = allowedOriginsEnv ? allowedOriginsEnv.split(",").map(o => o.trim()) : [];
 
-// 2. CORS制御ミドルウェア
+// 2. CORS制御ミドルウェア（本番運用時の厳格なオリジンチェック）
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   
@@ -53,7 +50,9 @@ app.use((req, res, next) => {
     }
     res.header("Access-Control-Allow-Origin", origin);
   } else {
-    res.header("Access-Control-Allow-Origin", allowedOrigins.length > 0 ? allowedOrigins[0] : "*");
+    if (allowedOrigins.length > 0) {
+      res.header("Access-Control-Allow-Origin", allowedOrigins[0]);
+    }
   }
 
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, x-api-key, x-signature, x-timestamp");
@@ -100,10 +99,12 @@ function safeCompare(a, b) {
 }
 
 /**
- * 3. Canonical JSON対応およびtimingSafeEqualによる厳格なHMAC署名検証ミドルウェア
+ * 3. Canonical JSON対応およびtimingSafeEqualによる厳格なHMAC署名検証ミドルウェア（APIキーと署名シークレットの分離）
  */
 app.use((req, res, next) => {
   const serverApiKey = process.env.API_KEY;
+  const hmacSecret = process.env.HMAC_SECRET || serverApiKey;
+
   if (!serverApiKey) {
     logger.error("Server configuration error: API_KEY is not configured.");
     return res.status(500).json({ error: "Internal Server Error" });
@@ -144,7 +145,7 @@ app.use((req, res, next) => {
   const payload = [clientTimestamp, req.method, req.originalUrl, bodyHash, queryHash].join(":");
 
   const expectedSignature = crypto
-    .createHmac("sha256", serverApiKey)
+    .createHmac("sha256", hmacSecret)
     .update(payload)
     .digest("hex");
 
@@ -159,9 +160,6 @@ app.use((req, res, next) => {
 app.use("/api/video", videoRouter);
 app.use("/api/search", searchRouter);
 app.use("/api/stream", streamRouter);
-app.use("/api/comment", commentRouter);
-app.use("/api/channel", channelRouter);
-app.use("/api/playlist", playlistRouter);
 
 // グローバルエラーハンドリングミドルウェア（内部エラー情報の外部流出を完全阻止）
 app.use((err, req, res, next) => {
