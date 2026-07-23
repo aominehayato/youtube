@@ -1,5 +1,8 @@
 import express from "express";
 import crypto from "crypto";
+import helmet from "helmet";
+import compression from "compression";
+import rateLimit from "express-rate-limit";
 import videoRouter from "./routes/video.js";
 import searchRouter from "./routes/search.js";
 import streamRouter from "./routes/stream.js";
@@ -11,7 +14,21 @@ const app = express();
 
 app.use(express.json());
 
-// 1. /health エンドポイントは認証やCORSの前に配置し、Render等の死活監視が確実に200を返すようにする
+// セキュリティヘッダーおよびレスポンス圧縮の適用
+app.use(helmet());
+app.use(compression());
+
+// 全APIに対するグローバルレートリミット（DDoS・ブルートフォース攻撃対策）
+const globalApiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests from this IP, please try again later." }
+});
+app.use("/api/", globalApiLimiter);
+
+// 1. /health エンドポイントは認証やCORSの前に配置し、死活監視が確実に200を返すようにする
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
@@ -23,7 +40,7 @@ app.get("/health", (req, res) => {
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || "";
 const allowedOrigins = allowedOriginsEnv ? allowedOriginsEnv.split(",").map(o => o.trim()) : [];
 
-// 2. CORS制御ミドルウェア（サーバー間通信やcurl等のOriginが存在しないリクエストは許可し、不正な外部Originのみ厳格に拒否）
+// 2. CORS制御ミドルウェア
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   
@@ -33,7 +50,6 @@ app.use((req, res, next) => {
     }
     res.header("Access-Control-Allow-Origin", origin);
   } else {
-    // Originが存在しないサーバー間通信やCLIツール等の場合はワイルドカードまたは最初の許可オリジンを適用
     res.header("Access-Control-Allow-Origin", allowedOrigins.length > 0 ? allowedOrigins[0] : "*");
   }
 
@@ -46,7 +62,7 @@ app.use((req, res, next) => {
 });
 
 /**
- * 3. 厳格なHMAC署名およびAPIキー認証ミドルウェア（リクエストボディの改ざん防止ハッシュを完備）
+ * 3. 厳格なHMAC署名およびAPIキー認証ミドルウェア（GET/POST双方のクエリ・ボディ改ざん防止に対応）
  */
 app.use((req, res, next) => {
   const serverApiKey = process.env.API_KEY;
@@ -54,13 +70,11 @@ app.use((req, res, next) => {
     return res.status(500).json({ error: "Server configuration error: API_KEY is not configured on the server." });
   }
 
-  // APIキーの検証
   const clientApiKey = req.headers["x-api-key"];
   if (clientApiKey !== serverApiKey) {
     return res.status(403).json({ error: "Forbidden: Invalid or missing API key." });
   }
 
-  // HMAC署名とタイムスタンプの完全必須化
   const clientSignature = req.headers["x-signature"];
   const clientTimestamp = req.headers["x-timestamp"];
 
@@ -68,17 +82,16 @@ app.use((req, res, next) => {
     return res.status(401).json({ error: "Unauthorized: Missing request signature or timestamp." });
   }
 
-  // タイムスタンプの有効期限は5分以内とする（リプレイ攻撃防止）
   const now = Date.now();
   const reqTime = parseInt(clientTimestamp, 10);
   if (isNaN(reqTime) || Math.abs(now - reqTime) > 5 * 60 * 1000) {
     return res.status(401).json({ error: "Unauthorized: Request timestamp expired or invalid." });
   }
 
-  // リクエストボディのハッシュ値を計算してペイロードに含め、ボディ改ざんを完全に封じる
+  // リクエストボディまたはクエリパラメータを含めた堅牢な署名ペイロードを構築
   const rawBody = req.body && Object.keys(req.body).length > 0 ? JSON.stringify(req.body) : "";
   const bodyHash = crypto.createHash("sha256").update(rawBody).digest("hex");
-  const payload = clientTimestamp + ":" + req.method + ":" + req.path + ":" + bodyHash;
+  const payload = [clientTimestamp, req.method, req.originalUrl, bodyHash].join(":");
 
   const expectedSignature = crypto
     .createHmac("sha256", serverApiKey)
@@ -86,7 +99,7 @@ app.use((req, res, next) => {
     .digest("hex");
 
   if (clientSignature !== expectedSignature) {
-    return res.status(403).json({ error: "Forbidden: Invalid request signature or tampered body." });
+    return res.status(403).json({ error: "Forbidden: Invalid request signature or tampered payload." });
   }
 
   next();
@@ -102,5 +115,5 @@ app.use("/api/playlist", playlistRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("SiaTube Production API server v2.7.0 started on port " + PORT);
+  console.log("SiaTube Production API server v2.8.0 started on port " + PORT);
 });
