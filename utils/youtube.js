@@ -20,8 +20,7 @@ export async function getYouTube() {
     try {
       const createdInstance = await Innertube.create({
         lang: "ja",
-        location: "JP",
-        retrieve_player: true
+        location: "JP"
       });
       instance = createdInstance;
       return instance;
