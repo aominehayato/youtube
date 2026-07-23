@@ -52,7 +52,7 @@ router.get("/", searchLimiter, async (req, res) => {
   } catch (error) {
     logger.error({ err: error, query }, "Search error");
     resetYouTubeIfCritical(error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
