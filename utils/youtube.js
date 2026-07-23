@@ -26,6 +26,7 @@ export async function getYouTube() {
       return instance;
     } catch (err) {
       console.error("Failed to initialize Innertube instance:", err);
+      instance = null;
       throw err;
     } finally {
       initializing = null;
@@ -33,4 +34,12 @@ export async function getYouTube() {
   })();
 
   return initializing;
+}
+
+/**
+ * 障害発生時にインスタンスを破棄し、次回呼び出し時に強制再初期化を行わせるための復旧関数
+ */
+export function resetYouTube() {
+  instance = null;
+  initializing = null;
 }
