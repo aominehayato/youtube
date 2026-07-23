@@ -65,10 +65,20 @@ router.get("/:id", streamLimiter, (req, res) => {
 
   const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
+  // RenderのSecret Files機能で配置されたCookieファイルのパス（存在する場合は自動適用）
+  const cookiePath = "/etc/secrets/cookies.txt";
+  const ytDlpArgs = ["-g", "--no-warnings", "--no-playlist"];
+  
+  if (fs.existsSync(cookiePath)) {
+    ytDlpArgs.push("--cookies", cookiePath);
+  }
+  
+  ytDlpArgs.push(videoUrl);
+
   const runYtDlp = () => {
     activeYtDlpProcesses++;
 
-    execFile(ytDlpPath, ["-g", "--no-warnings", "--no-playlist", videoUrl], { timeout: 15000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile(ytDlpPath, ytDlpArgs, { timeout: 15000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       activeYtDlpProcesses--;
       processQueue();
 
@@ -80,8 +90,8 @@ router.get("/:id", streamLimiter, (req, res) => {
           videoId
         }, "yt-dlp failed");
 
-        return res.status(500).json({
-          error: "yt-dlp failed"
+        return res.status(503).json({
+          error: "YouTube blocked this server or requires authentication. Please configure cookies."
         });
       }
 
