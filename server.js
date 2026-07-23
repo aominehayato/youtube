@@ -1,4 +1,5 @@
 import express from "express";
+import path from "path";
 import videoRouter from "./routes/video.js";
 import searchRouter from "./routes/search.js";
 import streamRouter from "./routes/stream.js";
@@ -11,7 +12,7 @@ const app = express();
 // JSON ボディパーサーのミドルウェアを設定
 app.use(express.json());
 
-// CORS 許可設定（GASやフロントエンドからのリクエストを通すため）
+// CORS 許可設定（本番環境では必要に応じて許可ドメインを制限してください）
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
@@ -41,5 +42,5 @@ app.get("/health", (req, res) => {
 // サーバーの起動
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("SiaTube API server started on port " + PORT);
+  console.log("SiaTube Production API server started on port " + PORT);
 });
