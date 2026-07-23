@@ -1,14 +1,21 @@
 import { Innertube } from "youtubei.js";
 
-// サーバー起動時に一度だけインスタンス生成の Promise を作成し、競合やnullエラーを防ぐ
-let youtubeInstancePromise = Innertube.create({
-  lang: "ja",
-  location: "JP"
-}).catch((err) => {
-  console.error("Failed to initialize Innertube:", err);
-  throw err;
-});
+let instance = null;
 
+/**
+ * サーバーのスリープ復帰時にも確実に再初期化できる安全なインスタンス取得関数
+ */
 export async function getYouTube() {
-  return await youtubeInstancePromise;
+  if (!instance) {
+    try {
+      instance = await Innertube.create({
+        lang: "ja",
+        location: "JP"
+      });
+    } catch (err) {
+      console.error("Failed to initialize Innertube:", err);
+      throw err;
+    }
+  }
+  return instance;
 }
