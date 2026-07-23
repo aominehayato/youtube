@@ -10,6 +10,11 @@ const router = express.Router();
 router.get("/:id", async (req, res) => {
   const videoId = req.params.id;
 
+  // 動画IDの形式検証
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+    return res.status(400).json({ error: "Invalid video id format." });
+  }
+
   try {
     const youtube = await getYouTube();
     const info = await youtube.getInfo(videoId);
