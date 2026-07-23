@@ -5,8 +5,14 @@ RUN groupadd -r siatube && useradd -r -m -d /app -g siatube siatube
 
 WORKDIR /app
 
+# デバッグ用：コンテナ内にコピーされる前の状況を確認
+RUN ls -la /app
+
 # 依存関係定義ファイルおよび完全なロックファイルをコピー
 COPY package*.json ./
+
+# デバッグ用：COPY直後のコンテナ内のファイルを強制表示
+RUN ls -la /app
 
 # npmキャッシュディレクトリを /tmp に設定して権限問題を完全に回避
 ENV npm_config_cache=/tmp/.npm
