@@ -1,7 +1,7 @@
 {
   "name": "siatube-backend",
-  "version": "2.6.0",
-  "description": "SiaTube Production Backend API Server with Strict Security and Docker Optimization",
+  "version": "2.7.0",
+  "description": "SiaTube Production Backend API Server with Strict Security, Body Hash HMAC, and Docker Optimization",
   "main": "server.js",
   "type": "module",
   "scripts": {
