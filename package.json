@@ -1,7 +1,7 @@
 {
   "name": "siatube-backend",
-  "version": "2.9.0",
-  "description": "SiaTube Commercial-grade Backend API Server with pino logging, granular rate limits, query HMAC verification, and non-root security",
+  "version": "2.9.1",
+  "description": "SiaTube Commercial-grade Backend API Server with pino logging, separated limiters, canonical HMAC verification, and non-root security",
   "main": "server.js",
   "type": "module",
   "scripts": {
