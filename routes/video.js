@@ -5,7 +5,7 @@ const router = express.Router();
 
 /**
  * GET /api/video/:id
- * 動画の詳細情報、チャンネル情報、および関連動画一覧を取得してJSONで返却する
+ * 動画の詳細情報および関連動画一覧を取得してJSONで返却する
  */
 router.get("/:id", async (req, res) => {
   const videoId = req.params.id;
@@ -18,7 +18,6 @@ router.get("/:id", async (req, res) => {
     const thumbnails = basicInfo.thumbnail || [];
     const thumbnailUrl = thumbnails.length > 0 ? thumbnails[thumbnails.length - 1].url : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
-    // 関連動画（ウォッチフィード等から抽出）
     const relatedVideos = [];
     const secondaryContents = info.secondary_contents || [];
     for (let i = 0; i < secondaryContents.length; i++) {
