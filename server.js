@@ -22,18 +22,20 @@ app.use((req, res, next) => {
   next();
 });
 
-// 簡易APIキー認証ミドルウェア（GASからのリクエストを守るため、環境変数 API_KEY を検証）
+// 厳格なAPIキー認証ミドルウェア（サーバー側にAPI_KEYの設定を強制し不正アクセスを完全ブロック）
 app.use((req, res, next) => {
   // ヘルスチェックは認証除外
   if (req.path === "/health") {
     return next();
   }
 
-  const clientApiKey = req.headers["x-api-key"];
   const serverApiKey = process.env.API_KEY;
+  if (!serverApiKey) {
+    return res.status(500).json({ error: "Server configuration error: API_KEY is not configured on the server." });
+  }
 
-  // 環境変数に API_KEY が設定されている場合のみチェックを実行
-  if (serverApiKey && clientApiKey !== serverApiKey) {
+  const clientApiKey = req.headers["x-api-key"];
+  if (clientApiKey !== serverApiKey) {
     return res.status(403).json({ error: "Forbidden: Invalid or missing API key." });
   }
 
