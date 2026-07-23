@@ -13,7 +13,8 @@ export async function getYouTube() {
   try {
     instance = await Innertube.create({
       lang: "ja",
-      location: "JP"
+      location: "JP",
+      retrieve_player: true
     });
     return instance;
   } catch (err) {
