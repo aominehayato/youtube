@@ -73,7 +73,15 @@ router.get("/:id", streamLimiter, (req, res) => {
 
   const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
-  const ytDlpArgs = ["-g", "--no-warnings", "--no-playlist"];
+  // Botブロック回避のためのクライアント指定引数を追加
+  const ytDlpArgs = [
+    "-g",
+    "--no-warnings",
+    "--no-playlist",
+    "--extractor-args",
+    "youtube:player_client=android,web"
+  ];
+  
   if (cookieExists) {
     ytDlpArgs.push("--cookies", cookiePath);
   }
