@@ -40,7 +40,7 @@ router.get("/:id", videoLimiter, async (req, res) => {
   } catch (error) {
     logger.error({ err: error, channelId }, "Channel error");
     resetYouTubeIfCritical(error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
