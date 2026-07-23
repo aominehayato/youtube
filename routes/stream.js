@@ -63,7 +63,6 @@ router.get("/:id", streamLimiter, (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 
-  // RenderのSecret Filesで配置されるCookieファイルのパス確認
   const cookiePath = "/etc/secrets/cookies.txt";
   const cookieExists = fs.existsSync(cookiePath);
   logger.info({
@@ -73,13 +72,15 @@ router.get("/:id", streamLimiter, (req, res) => {
 
   const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
-  // Botブロック回避のためのクライアント指定引数を追加
+  // JSランタイムとクライアント指定引数を適用
   const ytDlpArgs = [
     "-g",
     "--no-warnings",
     "--no-playlist",
+    "--js-runtimes",
+    "node",
     "--extractor-args",
-    "youtube:player_client=android,web"
+    "youtube:player_client=android"
   ];
   
   if (cookieExists) {
@@ -103,7 +104,8 @@ router.get("/:id", streamLimiter, (req, res) => {
         }, "yt-dlp failed");
 
         return res.status(500).json({
-          error: "yt-dlp failed"
+          error: "yt-dlp failed",
+          detail: stderr
         });
       }
 
