@@ -18,15 +18,16 @@ export async function getYouTube() {
 
   initializing = (async () => {
     try {
-      const createdInstance = await Innertube.create({
+      const youtube = await Innertube.create({
         lang: "ja",
         location: "JP",
-        client_type: "WEB"
+        retrieve_player: true
       });
-      instance = createdInstance;
-      return instance;
+      instance = youtube;
+      logger.info("YouTube client initialized");
+      return youtube;
     } catch (err) {
-      logger.error({ err }, "Failed to initialize Innertube instance");
+      logger.error({ err }, "Failed to initialize YouTube client");
       instance = null;
       throw err;
     } finally {
@@ -43,14 +44,13 @@ export async function getYouTube() {
 export function resetYouTubeIfCritical(error) {
   const msg = error?.message || "";
   if (
-    msg.includes("LOGIN_REQUIRED") ||
-    msg.includes("Innertube") ||
-    msg.includes("Sign in") ||
-    msg.includes("bot") ||
     msg.includes("signature") ||
-    msg.includes("extract")
+    msg.includes("extract") ||
+    msg.includes("Innertube") ||
+    msg.includes("LOGIN_REQUIRED") ||
+    msg.includes("bot")
   ) {
-    logger.warn({ err: error }, "Critical YouTube API error detected. Resetting Innertube instance.");
+    logger.warn({ err: error }, "Reset YouTube client");
     instance = null;
     initializing = null;
   }
