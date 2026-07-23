@@ -19,15 +19,14 @@ COPY server.js .
 COPY routes ./routes
 COPY utils ./utils
 
-# yt-dlpの実在確認済みバージョンを指定し、curlで安全にダウンロード・権限付与後、イメージ軽量化のためにビルドツールを削除
-ARG YTDLP_VERSION=2025.06.09
+# yt-dlpの動作に必要な python3, ca-certificates, curl をインストールし、最新の yt-dlp を安全に取得
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && apt-get install -y --no-install-recommends python3 ca-certificates curl \
     && mkdir -p /app/bin \
-    && curl -L https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp_linux -o /app/bin/yt-dlp \
-    && chmod +x /app/bin/yt-dlp \
+    && curl -fL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /app/bin/yt-dlp \
+    && chmod 755 /app/bin/yt-dlp \
     && /app/bin/yt-dlp --version \
-    && apt-get remove -y curl ca-certificates \
+    && apt-get remove -y curl \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
