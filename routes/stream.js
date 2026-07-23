@@ -63,8 +63,8 @@ router.get("/:id", streamLimiter, (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 
-  // 読み取り専用ファイルシステムおよび書き込みによるエラーを防ぐため /tmp/cookies.txt を直接参照する
-  const cookiePath = "/tmp/cookies.txt";
+  // 読み取り専用ファイルシステムの想定に合わせ、マウント先 /etc/secrets/cookies.txt を参照する
+  const cookiePath = "/etc/secrets/cookies.txt";
   const cookieExists = fs.existsSync(cookiePath) && fs.statSync(cookiePath).size > 0;
 
   logger.info({
@@ -74,17 +74,16 @@ router.get("/:id", streamLimiter, (req, res) => {
 
   const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
-  // JSランタイム（Node.js）、キャッシュ無効化、Cookie書き込み無効化、およびクライアント指定引数を適用
+  // 正しいJSランタイム指定（node:/usr/bin/node）、キャッシュ無効化、および android クライアント指定を適用
   const ytDlpArgs = [
     "-g",
     "--no-warnings",
     "--no-playlist",
     "--no-cache-dir",
-    "--no-write-cookies",
     "--js-runtimes",
-    "node",
+    "node:/usr/bin/node",
     "--extractor-args",
-    "youtube:player_client=android,web"
+    "youtube:player_client=android"
   ];
 
   if (cookieExists) {
