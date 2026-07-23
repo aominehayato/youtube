@@ -17,8 +17,9 @@ COPY routes ./routes
 COPY utils ./utils
 COPY scripts ./scripts
 
-# yt-dlp 実行に必要なシステム依存関係（ffmpeg含む）のインストールとバイナリの配置
-RUN apt-get update \
+# Node.jsパスの確認と、ffmpegを含むシステム依存関係のインストール、yt-dlpバイナリの配置
+RUN which node \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
        python3 \
        ca-certificates \
