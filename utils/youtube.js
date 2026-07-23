@@ -21,8 +21,7 @@ export async function getYouTube() {
       const createdInstance = await Innertube.create({
         lang: "ja",
         location: "JP",
-        retrieve_player: true,
-        generate_session_locally: true
+        client_type: "WEB"
       });
       instance = createdInstance;
       return instance;
