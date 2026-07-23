@@ -61,19 +61,28 @@ router.get("/:id", streamLimiter, (req, res) => {
   const runYtDlp = () => {
     activeYtDlpProcesses++;
 
-    execFile(ytDlpPath, ["-g", "--no-warnings", videoUrl], { timeout: 15000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile(ytDlpPath, ["-g", "--no-warnings", "--no-playlist", videoUrl], { timeout: 15000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       activeYtDlpProcesses--;
       processQueue();
 
       if (error) {
-        logger.error({ err: error, videoId }, "yt-dlp stream execution error");
-        return res.status(500).json({ error: "Internal Server Error" });
+        logger.error({
+          error: error.message,
+          stderr,
+          stdout,
+          videoId
+        }, "yt-dlp failed");
+
+        return res.status(500).json({
+          error: "yt-dlp failed"
+        });
       }
 
       const urls = stdout.trim().split("\n");
       const streamUrl = urls[0];
 
       if (!streamUrl) {
+        logger.error({ stderr, stdout, videoId }, "yt-dlp returned empty stream URL");
         return res.status(500).json({ error: "Internal Server Error" });
       }
 
