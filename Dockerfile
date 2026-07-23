@@ -1,41 +1,37 @@
 FROM node:20-slim
 
-# アプリケーション用 non-root グループおよびホームディレクトリ付き専用ユーザーを作成
+# Create a non-privileged user and group
 RUN groupadd -r siatube && useradd -r -m -d /app -g siatube siatube
 
+# Set working directory
 WORKDIR /app
 
-# 依存関係定義ファイルおよび完全なロックファイルをコピー
+# Install system dependencies (Python3, ca-certificates, curl, and Node.js for yt-dlp JS runtime)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 ca-certificates curl nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy package.json and install production dependencies
 COPY package*.json ./
-
-# npmキャッシュディレクトリを /tmp に設定して権限問題を完全に回避
-ENV npm_config_cache=/tmp/.npm
-
-# 本番用依存関係を厳格にインストール（package-lock.jsonを利用した安全な npm ci）
 RUN npm ci --omit=dev
 
-# アプリケーションソースコードをコピー
+# Copy application source code
 COPY server.js .
 COPY routes ./routes
 COPY utils ./utils
 COPY scripts ./scripts
 
-# yt-dlpの動作に必要な python3, ca-certificates, curl をインストールし、最新の yt-dlp を安全に取得
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 ca-certificates curl \
-    && mkdir -p /app/bin \
-    && curl -fL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /app/bin/yt-dlp \
-    && chmod 755 /app/bin/yt-dlp \
-    && /app/bin/yt-dlp --version \
-    && apt-get remove -y curl \
-    && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
+# Create bin directory and download the latest stable yt-dlp binary
+RUN mkdir -p /app/bin \
+    && curl -fL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /app/bin/yt-dlp \
+    && chmod +x /app/bin/yt-dlp
 
-# アプリケーションディレクトリの所有権を non-root ユーザーに変更
+# Change ownership of the app directory to the non-privileged user
 RUN chown -R siatube:siatube /app
 
-# non-root ユーザーに切り替え
+# Switch to non-privileged user
 USER siatube
 
 EXPOSE 3000
-CMD ["npm", "start"]
+
+CMD ["node", "server.js"]
