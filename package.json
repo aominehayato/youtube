@@ -17,6 +17,6 @@
     "helmet": "^8.0.0",
     "pino": "^9.0.0",
     "pino-http": "^10.0.0",
-    "youtubei.js": "^14.0.0"
+    "youtubei.js": "^16.0.0"
   }
 }
