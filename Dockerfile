@@ -2,18 +2,21 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# package-lock.json を含めて依存関係定義ファイルをコピー
+# セキュリティ強化のため専用の non-root ユーザー（siatube）を作成
+RUN groupadd -r siatube && useradd -r -g siatube -m -d /app siatube
+
+# 依存関係定義ファイルをコピー
 COPY package*.json ./
 
-# npm ci を用いて厳格かつ高速に本番用依存関係をインストール
+# 本番用依存関係を厳格にインストール
 RUN npm ci --omit=dev
 
-# アプリケーションソースコードを配置
+# アプリケーションソースコードをコピー
 COPY server.js .
 COPY routes ./routes
 COPY utils ./utils
 
-# yt-dlpの特定バージョンを指定し、curlを用いて安全にダウンロード・権限付与およびビルド時存在確認
+# yt-dlpの特定バージョンを指定し、curlを用いて安全にダウンロード・権限付与
 ARG YTDLP_VERSION=2026.07.21
 RUN mkdir -p /app/bin \
     && apt-get update && apt-get install -y curl \
@@ -21,6 +24,12 @@ RUN mkdir -p /app/bin \
     && chmod +x /app/bin/yt-dlp \
     && /app/bin/yt-dlp --version \
     && rm -rf /var/lib/apt/lists/*
+
+# アプリケーションディレクトリの所有権を non-root ユーザーに変更
+RUN chown -R siatube:siatube /app
+
+# non-root ユーザーに切り替え
+USER siatube
 
 EXPOSE 3000
 
