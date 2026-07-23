@@ -6,13 +6,12 @@ const router = express.Router();
 
 /**
  * GET /api/stream/:id
- * yt-dlp を用いてYouTubeの署名解除およびm3u8/direct URLを取得する
+ * yt-dlp を用いてYouTubeのストリームURLを取得する
  */
 router.get("/:id", (req, res) => {
   const videoId = req.params.id;
   const ytDlpPath = path.join(process.cwd(), "bin", "yt-dlp");
 
-  // yt-dlp を用いて直接ストリームURL（結合フォーマットまたは最高画質URL）を取得
   execFile(ytDlpPath, ["-g", "--no-warnings", "https://www.youtube.com/watch?v=" + videoId], { timeout: 15000 }, (error, stdout, stderr) => {
     if (error) {
       console.error("yt-dlp stream execution error for ID " + videoId + ":", error);
