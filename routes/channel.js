@@ -1,13 +1,14 @@
 import express from "express";
-import { getYouTube } from "../utils/youtube.js";
+import { getYouTube, resetYouTubeIfCritical } from "../utils/youtube.js";
+import { videoLimiter } from "../utils/limiter.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 
 /**
  * GET /api/channel/:id
- * チャンネル詳細情報および動画一覧を取得する
  */
-router.get("/:id", async (req, res) => {
+router.get("/:id", videoLimiter, async (req, res) => {
   const channelId = req.params.id;
 
   try {
@@ -19,8 +20,9 @@ router.get("/:id", async (req, res) => {
 
     for (let i = 0; i < content.length; i++) {
       const v = content[i];
+      if (!v) continue;
       videos.push({
-        id: v.id,
+        id: v.id || "",
         title: v.title?.text || v.title || "",
         thumbnail: v.thumbnails?.[0]?.url || "",
         duration: v.duration?.text || ""
@@ -36,7 +38,8 @@ router.get("/:id", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Channel error for ID " + channelId + ":", error);
+    logger.error({ err: error, channelId }, "Channel error");
+    resetYouTubeIfCritical(error);
     res.status(500).json({ error: error.message });
   }
 });
