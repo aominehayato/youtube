@@ -23,7 +23,9 @@ router.get("/:id", commentLimiter, async (req, res) => {
     const commentsList = [];
     const contents = commentsData.contents || [];
 
-    for (let i = 0; i < contents.length; i++) {
+    // BANリスク軽減のため最大50件に制限
+    const limitCount = Math.min(contents.length, 50);
+    for (let i = 0; i < limitCount; i++) {
       const c = contents[i];
       if (!c) continue;
       commentsList.push({
@@ -42,7 +44,7 @@ router.get("/:id", commentLimiter, async (req, res) => {
   } catch (error) {
     logger.error({ err: error, videoId }, "Comments error");
     resetYouTubeIfCritical(error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
