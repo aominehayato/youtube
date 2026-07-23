@@ -12,8 +12,7 @@ router.get("/:id", async (req, res) => {
 
   try {
     const youtube = await getYouTube();
-    const info = await youtube.getInfo(videoId);
-    const commentsData = await info.getComments();
+    const commentsData = await youtube.getComments(videoId);
 
     const commentsList = [];
     const contents = commentsData.contents || [];
