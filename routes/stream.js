@@ -84,7 +84,7 @@ router.get("/:id", streamLimiter, (req, res) => {
 
   const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
-  // JS Challenge 解決コンポーネント、ランタイム、フォーマット、クライアントを指定
+  // ローカル検証済みのオプション（EJSコンポーネント、JSランタイム、フォーマット指定を完全に一致させる）
   const ytDlpArgs = [
     "-g",
     "-f",
