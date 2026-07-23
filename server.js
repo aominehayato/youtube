@@ -3,6 +3,8 @@ import crypto from "crypto";
 import helmet from "helmet";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
+import pinoHttp from "pino-http";
+import logger from "./utils/logger.js";
 import videoRouter from "./routes/video.js";
 import searchRouter from "./routes/search.js";
 import streamRouter from "./routes/stream.js";
@@ -17,8 +19,9 @@ app.use(express.json());
 // セキュリティヘッダーおよびレスポンス圧縮の適用
 app.use(helmet());
 app.use(compression());
+app.use(pinoHttp({ logger }));
 
-// 全APIに対するグローバルレートリミット（DDoS・ブルートフォース攻撃対策）
+// グローバルベースレートリミット
 const globalApiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
@@ -28,7 +31,13 @@ const globalApiLimiter = rateLimit({
 });
 app.use("/api/", globalApiLimiter);
 
-// 1. /health エンドポイントは認証やCORSの前に配置し、死活監視が確実に200を返すようにする
+// エンドポイント別の細やかなレートリミット定義
+export const videoLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
+export const searchLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
+export const commentLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+export const streamLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+
+// 1. /health エンドポイントは認証やCORSの前に配置
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
@@ -36,7 +45,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-// 環境変数 ALLOWED_ORIGINS から許可するオリジンを取得
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || "";
 const allowedOrigins = allowedOriginsEnv ? allowedOriginsEnv.split(",").map(o => o.trim()) : [];
 
@@ -62,7 +70,7 @@ app.use((req, res, next) => {
 });
 
 /**
- * 3. 厳格なHMAC署名およびAPIキー認証ミドルウェア（GET/POST双方のクエリ・ボディ改ざん防止に対応）
+ * 3. クエリパラメータおよびボディ双方の改ざんを完全に防ぐ厳格なHMAC署名検証ミドルウェア
  */
 app.use((req, res, next) => {
   const serverApiKey = process.env.API_KEY;
@@ -88,10 +96,10 @@ app.use((req, res, next) => {
     return res.status(401).json({ error: "Unauthorized: Request timestamp expired or invalid." });
   }
 
-  // リクエストボディまたはクエリパラメータを含めた堅牢な署名ペイロードを構築
   const rawBody = req.body && Object.keys(req.body).length > 0 ? JSON.stringify(req.body) : "";
   const bodyHash = crypto.createHash("sha256").update(rawBody).digest("hex");
-  const payload = [clientTimestamp, req.method, req.originalUrl, bodyHash].join(":");
+  const queryHash = crypto.createHash("sha256").update(JSON.stringify(req.query)).digest("hex");
+  const payload = [clientTimestamp, req.method, req.originalUrl, bodyHash, queryHash].join(":");
 
   const expectedSignature = crypto
     .createHmac("sha256", serverApiKey)
@@ -115,5 +123,5 @@ app.use("/api/playlist", playlistRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("SiaTube Production API server v2.8.0 started on port " + PORT);
+  logger.info("SiaTube Production API server v2.9.0 started on port " + PORT);
 });
