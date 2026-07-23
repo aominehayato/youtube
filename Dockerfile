@@ -1,9 +1,9 @@
 FROM node:20-slim
 
-WORKDIR /app
+# アプリケーション用 non-root グループおよびユーザーを先に作成
+RUN groupadd -r siatube && useradd -r -g siatube siatube
 
-# セキュリティ強化のため専用の non-root ユーザー（siatube）を作成
-RUN groupadd -r siatube && useradd -r -g siatube -m -d /app siatube
+WORKDIR /app
 
 # 依存関係定義ファイルおよびロックファイルをコピー
 COPY package*.json ./
@@ -19,13 +19,16 @@ COPY server.js .
 COPY routes ./routes
 COPY utils ./utils
 
-# yt-dlpの特定バージョンを指定し、curlを用いて安全にダウンロード・権限付与（-o オプションを正しく使用）
+# yt-dlpの特定バージョンを指定し、curlを用いて安全にダウンロード・権限付与後、ビルド用パッケージを削除してイメージを軽量化
 ARG YTDLP_VERSION=2026.07.21
-RUN mkdir -p /app/bin \
-    && apt-get update && apt-get install -y curl \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && mkdir -p /app/bin \
     && curl -L https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp_linux -o /app/bin/yt-dlp \
     && chmod +x /app/bin/yt-dlp \
     && /app/bin/yt-dlp --version \
+    && apt-get remove -y curl \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 # アプリケーションディレクトリの所有権を non-root ユーザーに変更
