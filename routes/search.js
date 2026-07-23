@@ -11,8 +11,12 @@ const router = express.Router();
 router.get("/", searchLimiter, async (req, res) => {
   const query = req.query.q;
 
-  if (!query) {
+  if (!query || typeof query !== "string" || query.trim() === "") {
     return res.status(400).json({ error: "Query parameter 'q' is required." });
+  }
+
+  if (query.length > 200) {
+    return res.status(400).json({ error: "Query parameter 'q' is too long." });
   }
 
   try {
