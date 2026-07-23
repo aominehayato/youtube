@@ -1,49 +1,35 @@
 import express from "express";
-import { getYouTube } from "../utils/youtube.js";
+import { execFile } from "child_process";
+import path from "path";
 
 const router = express.Router();
 
 /**
  * GET /api/stream/:id
- * 動画の再生ストリームURL（videoplayback等）を解決して返却する
+ * yt-dlp を用いてYouTubeの署名解除およびm3u8/direct URLを取得する
  */
-router.get("/:id", async (req, res) => {
+router.get("/:id", (req, res) => {
   const videoId = req.params.id;
+  const ytDlpPath = path.join(process.cwd(), "bin", "yt-dlp");
 
-  try {
-    const youtube = await getYouTube();
-    const info = await youtube.getInfo(videoId);
-
-    // streamingData から再生用URLを取得
-    const streamingData = info.streaming_data;
-    if (!streamingData) {
-      throw new Error("Streaming data not available for this video.");
+  // yt-dlp を用いて直接ストリームURL（結合フォーマットまたは最高画質URL）を取得
+  execFile(ytDlpPath, ["-g", "--no-warnings", "https://www.youtube.com/watch?v=" + videoId], { timeout: 15000 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error("yt-dlp stream execution error for ID " + videoId + ":", error);
+      return res.status(500).json({ error: "Failed to extract stream URL via yt-dlp: " + error.message });
     }
 
-    let streamUrl = "";
-
-    // 結合フォーマットまたはアダプティブフォーマットから有効なURLを抽出
-    const formats = [].concat(streamingData.formats || [], streamingData.adaptive_formats || []);
-    for (let i = 0; i < formats.length; i++) {
-      if (formats[i].url) {
-        streamUrl = formats[i].url;
-        break;
-      }
-    }
-
-    if (!streamUrl) {
-      throw new Error("Could not extract a direct stream URL.");
+    const urls = stdout.trim().split("\n");
+    if (urls.length === 0 || !urls[0]) {
+      return res.status(500).json({ error: "No stream URL returned from yt-dlp." });
     }
 
     res.json({
       id: videoId,
-      url: streamUrl
+      url: urls[0],
+      audioUrl: urls.length > 1 ? urls[1] : null
     });
-
-  } catch (error) {
-    console.error("Stream URL error for ID " + videoId + ":", error);
-    res.status(500).json({ error: error.message });
-  }
+  });
 });
 
 export default router;
