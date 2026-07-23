@@ -24,7 +24,7 @@ router.get("/:id", async (req, res) => {
     const thumbnailUrl = thumbnails.length > 0 ? thumbnails[thumbnails.length - 1].url : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
     const relatedVideos = [];
-    const watchNextFeed = info.watch_next_feed?.contents || info.secondary_contents || [];
+    const watchNextFeed = info.watch_next_feed?.contents ?? info.secondary_contents ?? [];
     for (let i = 0; i < watchNextFeed.length; i++) {
       const item = watchNextFeed[i];
       if (item.type === "CompactVideo" || item.id) {
