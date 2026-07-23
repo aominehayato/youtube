@@ -7,13 +7,26 @@ import logger from "../utils/logger.js";
 
 const router = express.Router();
 
-// ストリームURLの有効期限（YouTubeの仕様を考慮し、安全のため4分間でキャッシュ破棄）
+// ストリームURLの有効期限（4分）とメモリリーク防止のためのキャッシュ上限管理
 const streamCache = new Map();
 const CACHE_TTL_MS = 4 * 60 * 1000;
+const MAX_CACHE_SIZE = 1000;
+
+// 同時実行数制限セマフォ（最大3プロセスまで）
+let activeYtDlpProcesses = 0;
+const MAX_CONCURRENT_YTDLP = 3;
+const executionQueue = [];
+
+function processQueue() {
+  if (executionQueue.length > 0 && activeYtDlpProcesses < MAX_CONCURRENT_YTDLP) {
+    const task = executionQueue.shift();
+    task();
+  }
+}
 
 /**
  * GET /api/stream/:id
- * yt-dlp を用いてYouTubeのストリームURLを取得し、キャッシュを活用して高速リダイレクトする
+ * yt-dlp を用いてYouTubeのストリームURLを取得し、同時実行制御とキャッシュを活用して高速リダイレクトする
  */
 router.get("/:id", streamLimiter, (req, res) => {
   const videoId = req.params.id;
@@ -34,28 +47,47 @@ router.get("/:id", streamLimiter, (req, res) => {
 
   if (!fs.existsSync(ytDlpPath)) {
     logger.error("Critical error: yt-dlp binary not found at " + ytDlpPath);
-    return res.status(500).json({ error: "Server configuration error: yt-dlp is not installed." });
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 
   const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
-  execFile(ytDlpPath, ["-g", "--no-warnings", videoUrl], { timeout: 15000 }, (error, stdout, stderr) => {
-    if (error) {
-      logger.error({ err: error, videoId }, "yt-dlp stream execution error");
-      return res.status(500).json({ error: "Failed to extract stream URL via yt-dlp: " + error.message });
+  const runYtDlp = () => {
+    activeYtDlpProcesses++;
+
+    execFile(ytDlpPath, ["-g", "--no-warnings", videoUrl], { timeout: 15000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      activeYtDlpProcesses--;
+      processQueue();
+
+      if (error) {
+        logger.error({ err: error, videoId }, "yt-dlp stream execution error");
+        return res.status(500).json({ error: "Internal Server Error" });
+      }
+
+      const urls = stdout.trim().split("\n");
+      const streamUrl = urls[0];
+
+      if (!streamUrl) {
+        return res.status(500).json({ error: "Internal Server Error" });
+      }
+
+      if (streamCache.size >= MAX_CACHE_SIZE) {
+        streamCache.clear();
+      }
+      streamCache.set(videoId, { url: streamUrl, timestamp: Date.now() });
+
+      return res.redirect(302, streamUrl);
+    });
+  };
+
+  if (activeYtDlpProcesses >= MAX_CONCURRENT_YTDLP) {
+    if (executionQueue.length >= 50) {
+      return res.status(429).json({ error: "Too many stream extraction requests, please try again later." });
     }
-
-    const urls = stdout.trim().split("\n");
-    const streamUrl = urls[0];
-
-    if (!streamUrl) {
-      return res.status(500).json({ error: "No stream URL returned from yt-dlp." });
-    }
-
-    streamCache.set(videoId, { url: streamUrl, timestamp: Date.now() });
-
-    return res.redirect(302, streamUrl);
-  });
+    executionQueue.push(runYtDlp);
+  } else {
+    runYtDlp();
+  }
 });
 
 export default router;
