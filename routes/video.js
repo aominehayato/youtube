@@ -10,6 +10,11 @@ const router = express.Router();
 router.get("/:id", async (req, res) => {
   const videoId = req.params.id;
 
+  // 動画IDの形式検証（不正な文字列やインジェクションを防ぐ）
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+    return res.status(400).json({ error: "Invalid video id format." });
+  }
+
   try {
     const youtube = await getYouTube();
     const info = await youtube.getInfo(videoId);
@@ -19,9 +24,9 @@ router.get("/:id", async (req, res) => {
     const thumbnailUrl = thumbnails.length > 0 ? thumbnails[thumbnails.length - 1].url : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
     const relatedVideos = [];
-    const secondaryContents = info.secondary_contents || [];
-    for (let i = 0; i < secondaryContents.length; i++) {
-      const item = secondaryContents[i];
+    const watchNextFeed = info.watch_next_feed?.contents || info.secondary_contents || [];
+    for (let i = 0; i < watchNextFeed.length; i++) {
+      const item = watchNextFeed[i];
       if (item.type === "CompactVideo" || item.id) {
         relatedVideos.push({
           id: item.id,
