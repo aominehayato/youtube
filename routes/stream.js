@@ -63,27 +63,40 @@ router.get("/:id", streamLimiter, (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 
-  const cookiePath = "/etc/secrets/cookies.txt";
-  const cookieExists = fs.existsSync(cookiePath);
+  // 読み取り専用ファイルシステムエラーを防ぐため、マウントされたCookieを /tmp にコピーして使用する
+  const sourceCookiePath = "/etc/secrets/cookies.txt";
+  const cookiePath = "/tmp/cookies.txt";
+  let cookieUsable = false;
+
+  try {
+    if (fs.existsSync(sourceCookiePath)) {
+      fs.copyFileSync(sourceCookiePath, cookiePath);
+      cookieUsable = fs.existsSync(cookiePath) && fs.statSync(cookiePath).size > 0;
+    }
+  } catch (err) {
+    logger.error({ error: err.message }, "Failed to copy cookies file");
+  }
+
   logger.info({
-    exists: cookieExists,
-    size: cookieExists ? fs.statSync(cookiePath).size : 0
+    exists: cookieUsable,
+    size: cookieUsable ? fs.statSync(cookiePath).size : 0
   }, "cookie check");
 
   const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
-  // JSランタイムとクライアント指定引数を適用
+  // JSランタイム（Node.js）、キャッシュ無効化、Cookie、およびクライアント指定引数を適用
   const ytDlpArgs = [
     "-g",
     "--no-warnings",
     "--no-playlist",
+    "--no-cache-dir",
     "--js-runtimes",
     "node",
     "--extractor-args",
     "youtube:player_client=android"
   ];
-  
-  if (cookieExists) {
+
+  if (cookieUsable) {
     ytDlpArgs.push("--cookies", cookiePath);
   }
   ytDlpArgs.push(videoUrl);
