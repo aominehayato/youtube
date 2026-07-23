@@ -2,7 +2,6 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# yt-dlp と ffmpeg, python3, curl のインストール
 RUN apt-get update && apt-get install -y \
     python3 \
     ffmpeg \
@@ -14,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 COPY package*.json ./
 RUN npm install --production
 
-COPY index.js .
+COPY server.js .
 
 EXPOSE 10000
 
