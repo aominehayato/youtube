@@ -21,30 +21,43 @@ if (fs.existsSync(filePath)) {
     : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux";
 
   console.log("Downloading yt-dlp from " + url);
+  downloadFile(url);
+}
 
-  const file = fs.createWriteStream(filePath);
-  https.get(url, (response) => {
-    if (response.statusCode === 301 || response.statusCode === 302) {
-      // リダイレクトに対応
-      https.get(response.headers.location, (redirectedRes) => {
-        redirectedRes.pipe(file);
-        file.on("finish", () => {
-          file.close();
-          finalizeInstallation();
-        });
-      }).on("error", (err) => {
-        console.error("Failed to download yt-dlp on redirect:", err);
-      });
+function downloadFile(targetUrl) {
+  https.get(targetUrl, (response) => {
+    // 300番台のリダイレクト（301, 302, 307, 308等）を安全に処理
+    if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+      console.log("Following redirect to: " + response.headers.location);
+      downloadFile(response.headers.location);
       return;
     }
 
+    if (response.statusCode !== 200) {
+      console.error("Failed to download yt-dlp. Status code: " + response.statusCode);
+      return;
+    }
+
+    const file = fs.createWriteStream(filePath);
     response.pipe(file);
+
     file.on("finish", () => {
       file.close();
       finalizeInstallation();
     });
+
+    file.on("error", (err) => {
+      console.error("File stream error during yt-dlp download:", err);
+      file.close();
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath); // 途中失敗時の空ファイル残存を防ぐ
+      }
+    });
   }).on("error", (err) => {
-    console.error("Failed to download yt-dlp:", err);
+    console.error("Failed to connect for yt-dlp download:", err);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
   });
 }
 
