@@ -5,7 +5,7 @@ const router = express.Router();
 
 /**
  * GET /api/search?q=キーワード
- * YouTube上の動画やチャンネルを検索して返す
+ * YouTube上の動画やチャンネルを安全に検索して返す
  */
 router.get("/", async (req, res) => {
   const query = req.query.q;
@@ -23,6 +23,7 @@ router.get("/", async (req, res) => {
 
     for (let i = 0; i < videos.length; i++) {
       const item = videos[i];
+      if (!item) continue;
       
       let itemType = "Video";
       if (item.type === "Channel") {
@@ -31,12 +32,13 @@ router.get("/", async (req, res) => {
         itemType = "Playlist";
       }
 
+      const itemId = item.id || item.playlist_id || item.channel_id || "";
       const thumbnails = item.thumbnails || [];
-      const thumbUrl = thumbnails.length > 0 ? thumbnails[0].url : `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`;
+      const thumbUrl = thumbnails.length > 0 ? thumbnails[0].url : `https://i.ytimg.com/vi/${itemId}/hqdefault.jpg`;
 
       results.push({
         type: itemType,
-        id: item.id || item.playlist_id || item.channel_id,
+        id: itemId,
         title: item.title?.text || item.title || "",
         thumbnail: thumbUrl,
         author: item.author?.name || "",
