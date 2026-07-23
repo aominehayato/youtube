@@ -6,28 +6,41 @@ const router = express.Router();
 
 /**
  * GET /api/stream/:id
- * yt-dlp を用いてYouTubeのストリームURLを取得する
+ * yt-dlp を用いてYouTubeのストリーム情報をJSON形式で安全に取得する
  */
 router.get("/:id", (req, res) => {
   const videoId = req.params.id;
-  const ytDlpPath = path.join(process.cwd(), "bin", "yt-dlp");
 
-  execFile(ytDlpPath, ["-g", "--no-warnings", "https://www.youtube.com/watch?v=" + videoId], { timeout: 15000 }, (error, stdout, stderr) => {
+  // 動画IDの形式検証（インジェクション対策）
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+    return res.status(400).json({ error: "Invalid video id format." });
+  }
+
+  const ytDlpPath = path.join(process.cwd(), "bin", "yt-dlp");
+  const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
+
+  // -j オプションを用いてJSONでメタデータおよび最適なプレイバックURLを取得
+  execFile(ytDlpPath, ["-j", "--no-warnings", videoUrl], { timeout: 15000 }, (error, stdout, stderr) => {
     if (error) {
       console.error("yt-dlp stream execution error for ID " + videoId + ":", error);
-      return res.status(500).json({ error: "Failed to extract stream URL via yt-dlp: " + error.message });
+      return res.status(500).json({ error: "Failed to extract stream info via yt-dlp: " + error.message });
     }
 
-    const urls = stdout.trim().split("\n");
-    if (urls.length === 0 || !urls[0]) {
-      return res.status(500).json({ error: "No stream URL returned from yt-dlp." });
+    try {
+      const info = JSON.parse(stdout.trim());
+      res.json({
+        id: videoId,
+        url: info.url || "",
+        audioUrl: info.audio_url || null,
+        width: info.width || null,
+        height: info.height || null,
+        fps: info.fps || null,
+        ext: info.ext || "mp4"
+      });
+    } catch (parseError) {
+      console.error("Failed to parse yt-dlp JSON output for ID " + videoId + ":", parseError);
+      return res.status(500).json({ error: "Failed to parse stream metadata." });
     }
-
-    res.json({
-      id: videoId,
-      url: urls[0],
-      audioUrl: urls.length > 1 ? urls[1] : null
-    });
   });
 });
 
