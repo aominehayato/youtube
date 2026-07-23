@@ -12,7 +12,9 @@ const isWindows = process.platform === "win32";
 const fileName = isWindows ? "yt-dlp.exe" : "yt-dlp";
 const filePath = path.join(binDir, fileName);
 
-// すでに存在する場合は再ダウンロードをスキップ
+// 50MBを超える不正な肥大化やDoSを防ぐための最大ダウンロードサイズ制限
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
 if (fs.existsSync(filePath)) {
   console.log("yt-dlp is already installed at " + filePath);
 } else {
@@ -26,7 +28,7 @@ if (fs.existsSync(filePath)) {
 
 function downloadFile(targetUrl) {
   https.get(targetUrl, (response) => {
-    // 300番台のリダイレクト（301, 302, 307, 308等）を安全に処理
+    // 300番台のリダイレクトを安全に追跡
     if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
       console.log("Following redirect to: " + response.headers.location);
       downloadFile(response.headers.location);
@@ -38,19 +40,35 @@ function downloadFile(targetUrl) {
       return;
     }
 
+    let downloadedBytes = 0;
     const file = fs.createWriteStream(filePath);
+
+    response.on("data", (chunk) => {
+      downloadedBytes += chunk.length;
+      if (downloadedBytes > MAX_FILE_SIZE) {
+        response.destroy();
+        file.close();
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+        console.error("Download aborted: File size exceeded the 50MB safety limit.");
+      }
+    });
+
     response.pipe(file);
 
     file.on("finish", () => {
       file.close();
-      finalizeInstallation();
+      if (downloadedBytes <= MAX_FILE_SIZE) {
+        finalizeInstallation();
+      }
     });
 
     file.on("error", (err) => {
       console.error("File stream error during yt-dlp download:", err);
       file.close();
       if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath); // 途中失敗時の空ファイル残存を防ぐ
+        fs.unlinkSync(filePath);
       }
     });
   }).on("error", (err) => {
