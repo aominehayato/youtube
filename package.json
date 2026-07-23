@@ -1,12 +1,11 @@
 {
   "name": "siatube-backend",
-  "version": "2.1.0",
+  "version": "2.3.0",
   "description": "SiaTube Production Backend API Server",
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "preinstall": "mkdir -p bin",
-    "postinstall": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o bin/yt-dlp && chmod +x bin/yt-dlp",
+    "postinstall": "node scripts/install-ytdlp.js",
     "start": "node server.js"
   },
   "engines": {
@@ -14,6 +13,7 @@
   },
   "dependencies": {
     "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
     "youtubei.js": "^14.0.0"
   }
 }
